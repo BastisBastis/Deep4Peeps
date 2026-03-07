@@ -1,0 +1,28 @@
+MOB.cpp 3567
+
+int16 Mob::GetMeleeDamageMod_SE(uint16 skill)
+{
+	int dmg_mod = 0;
+
+	// All skill dmg mod + Skill specific
+	dmg_mod += itembonuses.DamageModifier[EQ::skills::HIGHEST_SKILL+1] + spellbonuses.DamageModifier[EQ::skills::HIGHEST_SKILL+1] + aabonuses.DamageModifier[EQ::skills::HIGHEST_SKILL+1] +
+				itembonuses.DamageModifier[skill] + spellbonuses.DamageModifier[skill] + aabonuses.DamageModifier[skill];
+
+	if(dmg_mod < -100)
+		dmg_mod = -100;
+
+	return dmg_mod;
+}
+
+int16 Mob::GetMeleeMinDamageMod_SE(uint16 skill)
+{
+	int dmg_mod = 0;
+
+	dmg_mod = itembonuses.MinDamageModifier[skill] + spellbonuses.MinDamageModifier[skill] +
+				itembonuses.MinDamageModifier[EQ::skills::HIGHEST_SKILL+1] + spellbonuses.MinDamageModifier[EQ::skills::HIGHEST_SKILL+1];
+
+	if(dmg_mod < -100)
+		dmg_mod = -100;
+
+	return dmg_mod;
+}
