@@ -1,4 +1,217 @@
 
+
+//note: throughout this method, setting `damage` to a negative is a way to
+//stop the attack calculations
+bool Client::Attack(Mob* other, int hand, int damagePct)
+{
+	if (!other) {
+		SetTarget(nullptr);
+		Log(Logs::General, Logs::Error, "A null Mob object was passed to Client::Attack() for evaluation!");
+		return false;
+	}
+
+	if (hand != EQ::invslot::slotSecondary)
+		hand = EQ::invslot::slotPrimary;
+
+	Log(Logs::Detail, Logs::Combat, "Attacking %s with hand %d", other?other->GetName():"(nullptr)", hand);
+
+	
+
+	EQ::ItemInstance* weapon = GetInv().GetItem(hand);
+
+	Log(Logs::Detail, Logs::Combat, "Attacking with weapon: %s (%d)", weapon->GetItem()->Name, weapon->GetID());
+	} else {
+		Log(Logs::Detail, Logs::Combat, "Attacking without a weapon.");
+	}
+
+
+
+	// Now figure out damage
+	int damage = 1;
+	uint8 mylevel = GetLevel();
+	int baseDamage = GetBaseDamage(other, hand);
+
+	// anti-twink damage caps.  Taken from decompiles
+	if (mylevel < 10)
+	{
+		switch (GetClass())
+		{
+		case Class::Druid:
+		case Class::Cleric:
+		case Class::Shaman:
+			if (baseDamage > 9)
+				baseDamage = 9;
+			break;
+		case Class::Wizard:
+		case Class::Magician:
+		case Class::Necromancer:
+		case Class::Enchanter:
+			if (baseDamage > 6)
+				baseDamage = 6;
+			break;
+		default:
+			if (baseDamage > 10)
+				baseDamage = 10;
+		}
+	}
+	else if (mylevel < 20)
+	{
+		switch (GetClass())
+		{
+		case Class::Druid:
+		case Class::Cleric:
+		case Class::Shaman:
+			if (baseDamage > 12)
+				baseDamage = 12;
+			break;
+		case Class::Wizard:
+		case Class::Magician:
+		case Class::Necromancer:
+		case Class::Enchanter:
+			if (baseDamage > 10)
+				baseDamage = 10;
+			break;
+		default:
+			if (baseDamage > 14)
+				baseDamage = 14;
+		}
+	}
+	else if (mylevel < 30)
+	{
+		switch (GetClass())
+		{
+		case Class::Druid:
+		case Class::Cleric:
+		case Class::Shaman:
+			if (baseDamage > 20)
+				baseDamage = 20;
+			break;
+		case Class::Wizard:
+		case Class::Magician:
+		case Class::Necromancer:
+		case Class::Enchanter:
+			if (baseDamage > 12)
+				baseDamage = 12;
+			break;
+		default:
+			if (baseDamage > 30)
+				baseDamage = 30;
+		}
+	}
+	else if (mylevel < 40)
+	{
+		switch (GetClass())
+		{
+		case Class::Druid:
+		case Class::Cleric:
+		case Class::Shaman:
+			if (baseDamage > 26)
+				baseDamage = 26;
+			break;
+		case Class::Wizard:
+		case Class::Magician:
+		case Class::Necromancer:
+		case Class::Enchanter:
+			if (baseDamage > 18)
+				baseDamage = 18;
+			break;
+		default:
+			if (baseDamage > 60)
+				baseDamage = 60;
+		}
+	}
+	
+	int damageBonus = 0;
+	if (hand == EQ::invslot::slotPrimary)
+		damageBonus = GetDamageBonus();
+	int hate = baseDamage + damageBonus;
+
+	if (other->IsImmuneToMelee(this, hand))
+	{
+		damage = DMG_INVUL;
+	}
+	else
+	{
+		// check avoidance skills
+		other->AvoidDamage(this, damage);
+
+		if (damage < 0 && (damage == DMG_DODGE || damage == DMG_PARRY || damage == DMG_RIPOSTE || damage == DMG_BLOCK)
+			&& aabonuses.StrikeThrough && zone->random.Roll(aabonuses.StrikeThrough))
+		{
+			damage = 1;		// Warrior Tactical Mastery AA
+		}
+
+		//riposte
+		if (damage == DMG_RIPOSTE)
+		{
+			DoRiposte(other);
+			if (IsDead()) return false;
+		}
+
+		if (damage > 0)
+		{
+			// swing not avoided by skills; do avoidance AC check
+			if (!other->AvoidanceCheck(this, skillinuse))
+			{
+				Log(Logs::Detail, Logs::Combat, "Attack missed. Damage set to 0.");
+				damage = DMG_MISS;
+			}
+		}
+
+		CheckIncreaseSkill(skillinuse, other, zone->skill_difficulty[skillinuse].difficulty[GetClass()]);
+		CheckIncreaseSkill(EQ::skills::SkillOffense, other, zone->skill_difficulty[EQ::skills::SkillOffense].difficulty[GetClass()]);
+
+		if (damage > 0)
+		{
+			//try a finishing blow.. if successful end the attack
+			if(TryFinishingBlow(other, skillinuse, damageBonus))
+				return (true);
+
+			damage = damageBonus + CalcMeleeDamage(other, baseDamage, skillinuse);
+
+			if (damagePct <= 0)
+				damagePct = 100;
+			damage = damage * damagePct / 100;
+
+			other->TryShielderDamage(this, damage, skillinuse);		// warrior /shield
+			TryCriticalHit(other, skillinuse, damage, baseDamage, damageBonus);
+
+			Log(Logs::Detail, Logs::Combat, "Damage calculated to %d (str %d, skill %d, DMG %d, lv %d)",
+				damage, GetSTR(), GetSkill(skillinuse), baseDamage, mylevel);
+		}
+	}
+
+	// Hate Generation is on a per swing basis, regardless of a hit, miss, or block, its always the same.
+	// If we are this far, this means we are atleast making a swing.
+	other->AddToHateList(this, hate);
+
+	///////////////////////////////////////////////////////////
+	////// Send Attack Damage
+	///////////////////////////////////////////////////////////
+	other->Damage(this, damage, SPELL_UNKNOWN, skillinuse);
+
+	if (IsDead()) return false;
+
+	MeleeLifeTap(damage);
+
+	// old rogue poison from apply poison skill.  guaranteed procs first hit then fades
+	if (poison_spell_id && damage > 0 && hand == EQ::invslot::slotPrimary && skillinuse == EQ::skills::Skill1HPiercing)
+	{
+		ExecWeaponProc(weapon, poison_spell_id, other);
+		poison_spell_id = 0;
+	}
+
+	CommonBreakInvisNoSneak();
+
+	if (damage > 0)
+		return true;
+
+	else
+		return false;
+}
+
+
+
 #include "../common/global_define.h"
 #include "../common/eqemu_logsys.h"
 #include "../common/eq_constants.h"
@@ -487,215 +700,7 @@ int Mob::CalcEleWeaponResist(int weaponDamage, int resistType, Mob *target)
 
 
 
-//note: throughout this method, setting `damage` to a negative is a way to
-//stop the attack calculations
-bool Client::Attack(Mob* other, int hand, int damagePct)
-{
-	if (!other) {
-		SetTarget(nullptr);
-		Log(Logs::General, Logs::Error, "A null Mob object was passed to Client::Attack() for evaluation!");
-		return false;
-	}
 
-	if (hand != EQ::invslot::slotSecondary)
-		hand = EQ::invslot::slotPrimary;
-
-	Log(Logs::Detail, Logs::Combat, "Attacking %s with hand %d", other?other->GetName():"(nullptr)", hand);
-
-	
-
-	EQ::ItemInstance* weapon = GetInv().GetItem(hand);
-
-	Log(Logs::Detail, Logs::Combat, "Attacking with weapon: %s (%d)", weapon->GetItem()->Name, weapon->GetID());
-	} else {
-		Log(Logs::Detail, Logs::Combat, "Attacking without a weapon.");
-	}
-
-
-
-	// Now figure out damage
-	int damage = 1;
-	uint8 mylevel = GetLevel();
-	int baseDamage = GetBaseDamage(other, hand);
-
-	// anti-twink damage caps.  Taken from decompiles
-	if (mylevel < 10)
-	{
-		switch (GetClass())
-		{
-		case Class::Druid:
-		case Class::Cleric:
-		case Class::Shaman:
-			if (baseDamage > 9)
-				baseDamage = 9;
-			break;
-		case Class::Wizard:
-		case Class::Magician:
-		case Class::Necromancer:
-		case Class::Enchanter:
-			if (baseDamage > 6)
-				baseDamage = 6;
-			break;
-		default:
-			if (baseDamage > 10)
-				baseDamage = 10;
-		}
-	}
-	else if (mylevel < 20)
-	{
-		switch (GetClass())
-		{
-		case Class::Druid:
-		case Class::Cleric:
-		case Class::Shaman:
-			if (baseDamage > 12)
-				baseDamage = 12;
-			break;
-		case Class::Wizard:
-		case Class::Magician:
-		case Class::Necromancer:
-		case Class::Enchanter:
-			if (baseDamage > 10)
-				baseDamage = 10;
-			break;
-		default:
-			if (baseDamage > 14)
-				baseDamage = 14;
-		}
-	}
-	else if (mylevel < 30)
-	{
-		switch (GetClass())
-		{
-		case Class::Druid:
-		case Class::Cleric:
-		case Class::Shaman:
-			if (baseDamage > 20)
-				baseDamage = 20;
-			break;
-		case Class::Wizard:
-		case Class::Magician:
-		case Class::Necromancer:
-		case Class::Enchanter:
-			if (baseDamage > 12)
-				baseDamage = 12;
-			break;
-		default:
-			if (baseDamage > 30)
-				baseDamage = 30;
-		}
-	}
-	else if (mylevel < 40)
-	{
-		switch (GetClass())
-		{
-		case Class::Druid:
-		case Class::Cleric:
-		case Class::Shaman:
-			if (baseDamage > 26)
-				baseDamage = 26;
-			break;
-		case Class::Wizard:
-		case Class::Magician:
-		case Class::Necromancer:
-		case Class::Enchanter:
-			if (baseDamage > 18)
-				baseDamage = 18;
-			break;
-		default:
-			if (baseDamage > 60)
-				baseDamage = 60;
-		}
-	}
-	
-	int damageBonus = 0;
-	if (hand == EQ::invslot::slotPrimary)
-		damageBonus = GetDamageBonus();
-	int hate = baseDamage + damageBonus;
-
-	if (other->IsImmuneToMelee(this, hand))
-	{
-		damage = DMG_INVUL;
-	}
-	else
-	{
-		// check avoidance skills
-		other->AvoidDamage(this, damage);
-
-		if (damage < 0 && (damage == DMG_DODGE || damage == DMG_PARRY || damage == DMG_RIPOSTE || damage == DMG_BLOCK)
-			&& aabonuses.StrikeThrough && zone->random.Roll(aabonuses.StrikeThrough))
-		{
-			damage = 1;		// Warrior Tactical Mastery AA
-		}
-
-		//riposte
-		if (damage == DMG_RIPOSTE)
-		{
-			DoRiposte(other);
-			if (IsDead()) return false;
-		}
-
-		if (damage > 0)
-		{
-			// swing not avoided by skills; do avoidance AC check
-			if (!other->AvoidanceCheck(this, skillinuse))
-			{
-				Log(Logs::Detail, Logs::Combat, "Attack missed. Damage set to 0.");
-				damage = DMG_MISS;
-			}
-		}
-
-		CheckIncreaseSkill(skillinuse, other, zone->skill_difficulty[skillinuse].difficulty[GetClass()]);
-		CheckIncreaseSkill(EQ::skills::SkillOffense, other, zone->skill_difficulty[EQ::skills::SkillOffense].difficulty[GetClass()]);
-
-		if (damage > 0)
-		{
-			//try a finishing blow.. if successful end the attack
-			if(TryFinishingBlow(other, skillinuse, damageBonus))
-				return (true);
-
-			damage = damageBonus + CalcMeleeDamage(other, baseDamage, skillinuse);
-
-			if (damagePct <= 0)
-				damagePct = 100;
-			damage = damage * damagePct / 100;
-
-			other->TryShielderDamage(this, damage, skillinuse);		// warrior /shield
-			TryCriticalHit(other, skillinuse, damage, baseDamage, damageBonus);
-
-			Log(Logs::Detail, Logs::Combat, "Damage calculated to %d (str %d, skill %d, DMG %d, lv %d)",
-				damage, GetSTR(), GetSkill(skillinuse), baseDamage, mylevel);
-		}
-	}
-
-	// Hate Generation is on a per swing basis, regardless of a hit, miss, or block, its always the same.
-	// If we are this far, this means we are atleast making a swing.
-	other->AddToHateList(this, hate);
-
-	///////////////////////////////////////////////////////////
-	////// Send Attack Damage
-	///////////////////////////////////////////////////////////
-	other->Damage(this, damage, SPELL_UNKNOWN, skillinuse);
-
-	if (IsDead()) return false;
-
-	MeleeLifeTap(damage);
-
-	// old rogue poison from apply poison skill.  guaranteed procs first hit then fades
-	if (poison_spell_id && damage > 0 && hand == EQ::invslot::slotPrimary && skillinuse == EQ::skills::Skill1HPiercing)
-	{
-		ExecWeaponProc(weapon, poison_spell_id, other);
-		poison_spell_id = 0;
-	}
-
-	CommonBreakInvisNoSneak();
-
-	if (damage > 0)
-		return true;
-
-	else
-		return false;
-}
 
 
 
