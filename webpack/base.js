@@ -9,8 +9,18 @@ module.exports = {
   mode: "development",
   devtool: "eval-source-map",
   devServer: {
-    port:port
+    port: port,
+    contentBase: path.resolve(__dirname, "../dist"), // ← servera dist/
+    compress: true,
+    hot: true,
+    publicPath: '/', // bundlens URL
   },
+  output: {
+    path: path.resolve(__dirname, "../dist"), // katalog där bundle "skulle skrivas"
+    filename: 'bundle.js',                     // bundlade filnamnet
+    publicPath: '/',                           // viktig för dev-server
+  },
+  
   entry: {
   main: './src/main.js',
   
