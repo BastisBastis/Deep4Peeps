@@ -61,23 +61,36 @@ const classes={
 	return toHit;
   }
   
-  const getAvoidance = () =>{
-  	return 50
-  }
+  const getAvoidance= (targetLevel, targetBonusAGI = 0, bonusAvoidance = 0)=>
+{
+	
+	var level = targetLevel
+	var avoidance = level * 9 + 5
+	
+
+	if (level <= 50 && avoidance > 400)
+		avoidance = 400;
+	else if (avoidance > 460)
+		avoidance = 460;
+	
+
+	// this is how Live does it for PCs and NPCs.  AK might have (likely) been different.  Can't know how AK did it.
+	// but the difference is so small nobody would notice
+	
+	if (avoidance < 1)
+		avoidance = 1;
+	
+
+	return avoidance;
+}
   
-  const randf = (min, max) => { //TODO: Update to EQ RNG
-  	return Math.random() * (max - min) + min
-  }
   
-  const randi = (min, max) => { //TODO: Update to EQ RNG
-  	return Math.Floor(Math.random() * (max - min) )+ min
-  }
   
-  const avoidanceCheck = (offenseSkillLevel, weaponSkillLevel)=> {
+  const avoidanceCheck = (offenseSkillLevel, weaponSkillLevel, targetLevel)=> {
 	
 
 	var toHit = getToHit(offenseSkillLevel, weaponSkillLevel)
-	var avoidance = getAvoidance()
+	var avoidance = getAvoidance(targetLevel)
 	var toHitPct = 0
 	var avoidancePct = 0
 	
@@ -118,7 +131,7 @@ const classes={
 	console.log(`Hit chance: ${hitChance}`)
 
 
-	if (randf(0.0, 1.0) < hitChance)
+	if (rng.real(0.0, 1.0) < hitChance)
 	{
 		console.log("hit")
 		return true;
@@ -369,7 +382,7 @@ const rollDamageMultiplier = (offense, skill, charClass, level) =>
     
     //Assume attacking from behind, skip avoidDamage() (dodge etc)
     
-    if (!avoidanceCheck(offenseSkillLevel, weaponSkillLevel)) {
+    if (!avoidanceCheck(offenseSkillLevel, weaponSkillLevel, targetLevel)) {
     	console.log("Failed avoidance check")
     	return 0
     }
