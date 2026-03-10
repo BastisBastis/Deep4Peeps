@@ -128,30 +128,30 @@ const classes={
 	{
 		hitChance = toHit * 1.21 / (avoidance * 2.0);
 	}
-	console.log(`Hit chance: ${hitChance}`)
+	//console.log(`Hit chance: ${hitChance}`)
 
 
 	if (rng.real(0.0, 1.0) < hitChance)
 	{
-		console.log("hit")
+		//console.log("hit")
 		return true;
 	}
 
-	console.log("miss")
+	//console.log("miss")
 	return false;
 }
   
   const getDamageBonus = (primary, charClass, level, weaponType, delay) =>{
     
     if (level < 28 || !isDmgBonusClass(charClass)) {
-    	console.log("no damage bonus", level, primary, !isDmgBonusClass())
+    	//console.log("no damage bonus", level, primary, !isDmgBonusClass())
 		return 0
 	}
 
 	var bonus = 1 + (level - 28) / 3
 	
 
-	if ( weaponType == weaponTypes.ONE_HAND )
+	if ( weaponType == weaponTypes.TWO_HAND )
 	{
 		if (delay <= 27)
 			return bonus + 1
@@ -265,7 +265,7 @@ const getMitigation = (ac, level) =>
 	if (mit < 1)
 		mit = 1;
 
-    console.log(`mitigation: ${mit}`)
+    //console.log(`mitigation: ${mit}`)
 
 	return mit;
 }
@@ -278,13 +278,13 @@ const getMitigation = (ac, level) =>
 		baseDamage /= 2;
 
 	var offense = getOffense(weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass)
-    console.log(`in calcMeleeDamage offense ${offense}`)
+    //console.log(`in calcMeleeDamage offense ${offense}`)
 	// mitigation roll
 	var roll = rollD20(offense, getMitigation(targetAC, targetLevel));
-    console.log(`in calcMeleeDamage roll ${roll}`)
+    //console.log(`in calcMeleeDamage roll ${roll}`)
 
 	var minHit = baseDamage
-    console.log(`in calcMeleeDamage minhit ${minHit}`)
+    //console.log(`in calcMeleeDamage minhit ${minHit}`)
 	
 
 	var damage = (roll * baseDamage + 5) / 10;
@@ -368,22 +368,57 @@ const rollDamageMultiplier = (offense, skill, charClass, level) =>
 	}
 }
   
+const getDoubleAttackChance = (doubleAttackSkillLevel, level) => {
+    var chance = doubleAttackSkillLevel
+
+	if (chance > 0)
+	{
+		chance += level
+	}
+
+    /*
+	// Bestial Frenzy/Harmonious Attack AA - grants double attacks for classes that otherwise do not get the skill
+	if (aabonuses.GiveDoubleAttack)
+		chance += aabonuses.GiveDoubleAttack * 5;
+
+	// Knight's Advantage and Ferocity AAs; Double attack rate is 67% at 245 skill with Ferocity, so this is the only way it can be
+	if (aabonuses.DoubleAttackChance)
+		chance += chance * aabonuses.DoubleAttackChance / 100;
+    */
+
+	return chance
+}
+
+const getDualWieldChance = (dualWieldSkillLevel, level) => {
+    var chance = dualWieldSkillLevel
+	if (chance > 0)
+	{
+		chance += level
+	}
+
+	//chance += aabonuses.Ambidexterity; // 32
+
+	// SE_DualWieldChance[176] - Deftdance and Kinesthetics Disciplines
+	//chance += spellbonuses.DualWieldChance;
+
+	return chance
+}
 
 
-  export const get_damage = (primary = true, charClass = classes.WARRIOR, level = 60, weaponType = weaponTypes.ONE_HAND, baseDamage = 10, delay = 30, weaponSkillLevel = 250, offenseSkillLevel = 250, dexterity = 255, strength = 255, targetAC = 800, targetLevel = 60) => {
+  const get_attack_result = (primary = true, charClass = classes.WARRIOR, level = 60, weaponType = weaponTypes.ONE_HAND, baseDamage = 10, delay = 30, weaponSkillLevel = 250, offenseSkillLevel = 250, dexterity = 255, strength = 255, targetAC = 800, targetLevel = 60) => {
     var damage = 1
     
-    console.log(`Base Damage ${baseDamage}`)
+    //console.log(`Base Damage ${baseDamage}`)
 
     //skip damage caps - not worth it
     
     const damageBonus = getDamageBonus(primary, charClass, level, weaponType, delay)
-    console.log(`Damage bonus: ${damageBonus}`)
+    //console.log(`Damage bonus: ${damageBonus}`)
     
     //Assume attacking from behind, skip avoidDamage() (dodge etc)
     
     if (!avoidanceCheck(offenseSkillLevel, weaponSkillLevel, targetLevel)) {
-    	console.log("Failed avoidance check")
+    	//console.log("Failed avoidance check")
     	return 0
     }
     
@@ -391,8 +426,100 @@ const rollDamageMultiplier = (offense, skill, charClass, level) =>
     
     
     
-    console.log("damage damagebonus", baseDamage, damageBonus)
+    //console.log("damage damagebonus", baseDamage, damageBonus)
     
 
-    return damage
+    return Math.floor(damage)
+  }
+
+  export const simulate = ({
+    charClass = classes.WARRIOR, 
+    level = 60, 
+    weaponType = weaponTypes.ONE_HAND, 
+    baseDamage = 10, 
+    delay = 30, 
+    weaponSkillLevel = 250, 
+    offhandWeaponSkillLevel = 250,
+    offenseSkillLevel = 250, 
+    dexterity = 255, 
+    strength = 255, 
+    targetAC = 800, 
+    targetLevel = 60,
+    simulation_duration = 1000, //seconds,
+    dualWield = true,
+    offhandWeaponType = weaponTypes.ONE_HAND,
+    offhandBaseDamage = 15,
+    offhandDelay = 10,
+    doubleAttackSkillLevel = 250,
+    dualWieldSkillLevel = 250, 
+    haste = 100
+  } = {}) => {
+    var timer = 0
+    var total_damage = 0
+    var hits = []
+    var dualWieldTimer = 0
+    var numMainAttacks = 0
+    var numDoubleAttacks = 0
+    var numTripleAttacks = 0
+    var numOffhandAttacks = 0
+    while (timer < simulation_duration) {
+        //try proc
+        
+        //Regular attack
+        var damage = get_attack_result(true, charClass, level, weaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+        hits.push(damage)
+        total_damage += damage
+        numMainAttacks++
+
+        //Try double attack
+        if (getDoubleAttackChance(doubleAttackSkillLevel, level) > rng.int(0,499)) {
+            var damage = get_attack_result(true, charClass, level, weaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+            hits.push(damage)
+            total_damage += damage
+            numDoubleAttacks++
+
+            //try triple attack
+            if ((charClass == classes.WARRIOR || charClass == classes.MONK) && level >= 60 && (rng.int(0,999) < 135)) {
+                var damage = get_attack_result(true, charClass, level, offhandWeaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+                hits.push(damage)
+                total_damage += damage
+                numTripleAttacks++
+            }
+
+        }
+
+        if (dualWield) {
+         //Dual Wield
+            dualWieldTimer += delay
+            while (dualWieldTimer >= offhandDelay) {
+                
+                //CheckDualWield
+                if (getDualWieldChance(dualWieldSkillLevel, level) > rng.int(0, 374)) {
+                    numOffhandAttacks++
+                    var damage = get_attack_result(false, charClass, level, weaponType, offhandBaseDamage, offhandDelay, offhandWeaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+                    hits.push(damage)
+                    total_damage += damage
+                    //try proc
+                    //attack offhand
+                }
+                dualWieldTimer -= offhandDelay
+            }
+        }
+
+       
+
+        
+        timer += delay/10
+    }
+    var dps = total_damage/simulation_duration
+    return {
+        dps: Math.floor(dps * 10) / 10,
+        total_damage : total_damage,
+        hits: hits,
+        numDoubleAttacks,
+        numMainAttacks,
+        numTripleAttacks,
+        numOffhandAttacks
+    }
+
   }
