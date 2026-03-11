@@ -40,6 +40,11 @@
   let targetAC = 800;
   let targetLevel = 60;
   let simulation_duration = 1000;
+  let dualWield = true;
+  let offhandWeaponType = weaponTypes.ONE_HAND;
+  let offhandBaseDamage = 10
+  let offhandDelay = 30
+  let offhandWeaponSkillLevel = 250
 
 
   const start_sim = () => {
@@ -55,7 +60,11 @@
       strength,
       targetAC,
       targetLevel,
-      simulation_duration
+      simulation_duration,
+      offhandBaseDamage,
+      offhandWeaponSkillLevel,
+      offhandWeaponType,
+      offhandDelay
     })
     result_string = `Result: ${result.dps} dps - MH: ${result.numMainAttacks} - DA: ${result.numDoubleAttacks} - TA: ${result.numTripleAttacks} - OH: ${result.numOffhandAttacks}`
     hits_string = ""
@@ -92,7 +101,7 @@
   </label>
 
   <label>
-    Weapon Type
+    Main hand Weapon Type
     <select bind:value={weaponType}>
       {#each Object.keys(weaponTypes) as k}
         <option value={weaponTypes[k]}>{k}</option>
@@ -101,18 +110,42 @@
   </label>
 
   <label>
-    Base Damage
+    Main hand Base Damage
     <input type="number" bind:value={baseDamage} />
   </label>
 
   <label>
-    Delay
+    Main hand Delay
     <input type="number" bind:value={delay} />
   </label>
 
   <label>
-    Weapon Skill
+    Main hand Weapon Skill
     <input type="number" bind:value={weaponSkillLevel} />
+  </label>
+
+  <label>
+    Offhand Weapon Type
+    <select bind:value={offhandWeaponType}>
+      {#each Object.keys(weaponTypes) as k}
+        <option value={weaponTypes[k]}>{k}</option>
+      {/each}
+    </select>
+  </label>
+
+  <label>
+    Offhand Base Damage
+    <input type="number" bind:value={offhandBaseDamage} />
+  </label>
+
+  <label>
+    Offhand Delay
+    <input type="number" bind:value={offhandDelay} />
+  </label>
+
+  <label>
+    Offhand Weapon Skill
+    <input type="number" bind:value={offhandWeaponSkillLevel} />
   </label>
 
   <label>
