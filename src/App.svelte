@@ -1,5 +1,6 @@
 <script>
   import {simulate} from "./DamageSimulator.js"
+  import { test } from "./DbManager.js"
   var result_string = "Not started yet"
   var hits_string = ""
 
