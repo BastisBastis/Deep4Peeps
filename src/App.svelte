@@ -1,6 +1,6 @@
-<script>
+  <script>
   import {simulate} from "./DamageSimulator.js"
-  import { test } from "./DbManager.js"
+  
   var result_string = "Not started yet"
   var hits_string = ""
 
@@ -46,6 +46,8 @@
   let offhandBaseDamage = 10
   let offhandDelay = 30
   let offhandWeaponSkillLevel = 250
+  
+  
 
 
   const start_sim = () => {

@@ -3,7 +3,7 @@
     "fs": "0.0.1-security",
     "mersenne-twister": "^1.1.0",
     "path": "^0.12.7",
-    "sqlite3": "^5.1.7",
+    "sql.js": "latest",
     "svelte": "^3.59.0",
     "url": "^0.11.4"
   },
@@ -26,7 +26,10 @@
   },
   "scripts": {
     "xbuild": "webpack --config webpack/prod.js ",
-    "start": "webpack-dev-server --config webpack/base.js --open"
+    "start": "webpack-dev-server --config webpack/base.js --open",
+    "export_weapons": "node scripts/exportWeapons.js",
+    "export_spells": "node scripts/exportSpells.js",
+    "find_tables": "node scripts/findTables.js"
   },
   "main": "src/scenes/Game.js"
 }
