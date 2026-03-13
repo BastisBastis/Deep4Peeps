@@ -46,6 +46,8 @@
   let offhandBaseDamage = 10
   let offhandDelay = 30
   let offhandWeaponSkillLevel = 250
+  let haste = 40
+  let wornAtk = 0
   
   
 
@@ -67,7 +69,9 @@
       offhandBaseDamage,
       offhandWeaponSkillLevel,
       offhandWeaponType,
-      offhandDelay
+      offhandDelay,
+      haste,
+      wornAtk
     })
     result_string = `Result: ${result.dps} dps - MH: ${result.numMainAttacks} - DA: ${result.numDoubleAttacks} - TA: ${result.numTripleAttacks} - OH: ${result.numOffhandAttacks}`
     hits_string = ""
@@ -154,6 +158,16 @@
   <label>
     Offense Skill
     <input type="number" bind:value={offenseSkillLevel} />
+  </label>
+
+  <label>
+    Worn haste
+    <input type="number" bind:value={haste} />
+  </label>
+
+  <label>
+    Worn ATK
+    <input type="number" bind:value={wornAtk} />
   </label>
 
   <label>

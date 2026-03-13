@@ -192,7 +192,7 @@ const classes={
     
   }
   
-  const getOffense = (weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass) =>
+  const getOffense = (weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass, wornAtk) =>
 {
 	var statBonus
 
@@ -206,7 +206,7 @@ const classes={
 	}
 	
 	var spellBonus = 0 // spellbonus.ATK
-	var itemBonus = 0 // itemBonus
+	var itemBonus = wornAtk
 
 	var offense = weaponSkillLevel + spellBonus + itemBonus + (statBonus >= 75 ? ((2 * statBonus - 150) / 3) : 0);
 	if (offense < 1)
@@ -270,14 +270,14 @@ const getMitigation = (ac, level) =>
 	return mit;
 }
   
-  const calcMeleeDamage = (baseDamage, weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass, targetAC, targetLevel) =>
+  const calcMeleeDamage = (baseDamage, weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass, targetAC, targetLevel, wornAtk) =>
 {
 
 	// ranged physical damage does half that of melee
 	if (weaponType == weaponTypes.ARCHERY)
 		baseDamage /= 2;
 
-	var offense = getOffense(weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass)
+	var offense = getOffense(weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass, wornAtk)
     //console.log(`in calcMeleeDamage offense ${offense}`)
 	// mitigation roll
 	var roll = rollD20(offense, getMitigation(targetAC, targetLevel));
@@ -405,7 +405,7 @@ const getDualWieldChance = (dualWieldSkillLevel, level) => {
 }
 
 
-  const get_attack_result = (primary = true, charClass = classes.WARRIOR, level = 60, weaponType = weaponTypes.ONE_HAND, baseDamage = 10, delay = 30, weaponSkillLevel = 250, offenseSkillLevel = 250, dexterity = 255, strength = 255, targetAC = 800, targetLevel = 60) => {
+  const get_attack_result = (primary = true, charClass = classes.WARRIOR, level = 60, weaponType = weaponTypes.ONE_HAND, baseDamage = 10, delay = 30, weaponSkillLevel = 250, offenseSkillLevel = 250, dexterity = 255, strength = 255, targetAC = 800, targetLevel = 60, wornAtk = 0) => {
     var damage = 1
     
     //console.log(`Base Damage ${baseDamage}`)
@@ -422,7 +422,7 @@ const getDualWieldChance = (dualWieldSkillLevel, level) => {
     	return 0
     }
     
-    damage = damageBonus + calcMeleeDamage(baseDamage, weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass, targetAC, targetLevel)
+    damage = damageBonus + calcMeleeDamage(baseDamage, weaponType, weaponSkillLevel, offenseSkillLevel, dexterity, strength, level, charClass, targetAC, targetLevel, wornAtk)
     
     
     
@@ -452,8 +452,14 @@ const getDualWieldChance = (dualWieldSkillLevel, level) => {
     offhandDelay = 10,
     doubleAttackSkillLevel = 250,
     dualWieldSkillLevel = 250, 
-    haste = 100
+    haste = 40,
+    wornAtk = 0
   } = {}) => {
+
+    delay = delay / ((100+haste)/100)
+    offhandDelay = offhandDelay / ((100+haste)/100)
+    console.log(delay)
+
     var timer = 0
     var total_damage = 0
     var hits = []
@@ -466,21 +472,21 @@ const getDualWieldChance = (dualWieldSkillLevel, level) => {
         //try proc
         
         //Regular attack
-        var damage = get_attack_result(true, charClass, level, weaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+        var damage = get_attack_result(true, charClass, level, weaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel, wornAtk)
         hits.push(damage)
         total_damage += damage
         numMainAttacks++
 
         //Try double attack
         if (getDoubleAttackChance(doubleAttackSkillLevel, level) > rng.int(0,499)) {
-            var damage = get_attack_result(true, charClass, level, weaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+            var damage = get_attack_result(true, charClass, level, weaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel, wornAtk)
             hits.push(damage)
             total_damage += damage
             numDoubleAttacks++
 
             //try triple attack
             if ((charClass == classes.WARRIOR || charClass == classes.MONK) && level >= 60 && (rng.int(0,999) < 135)) {
-                var damage = get_attack_result(true, charClass, level, offhandWeaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+                var damage = get_attack_result(true, charClass, level, offhandWeaponType, baseDamage, delay, weaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel, wornAtk)
                 hits.push(damage)
                 total_damage += damage
                 numTripleAttacks++
@@ -496,7 +502,7 @@ const getDualWieldChance = (dualWieldSkillLevel, level) => {
                 //CheckDualWield
                 if (getDualWieldChance(dualWieldSkillLevel, level) > rng.int(0, 374)) {
                     numOffhandAttacks++
-                    var damage = get_attack_result(false, charClass, level, weaponType, offhandBaseDamage, offhandDelay, offhandWeaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel)
+                    var damage = get_attack_result(false, charClass, level, weaponType, offhandBaseDamage, offhandDelay, offhandWeaponSkillLevel, offenseSkillLevel, dexterity, strength, targetAC, targetLevel, wornAtk)
                     hits.push(damage)
                     total_damage += damage
                     //try proc
